@@ -1,0 +1,93 @@
+name: 🚀 AWS Redis Infrastructure CI/CD Pipeline
+
+on:
+  push:
+    branches: [ 'main', 'homolog', 'dev', 'develop' ]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/ci-cd-redis.yml'
+  pull_request:
+    branches: [ 'main', 'homolog', 'dev', 'develop' ]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/ci-cd-redis.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente de Deploy (prd, dev, hml)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - hml
+          - prd
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  deploy:
+    name: "🚀 Build, Test & Deploy (AWS Redis)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: >-
+      ${{ 
+        github.event.inputs.environment || 
+        (github.base_ref == 'main' && 'prd') || 
+        (github.ref == 'refs/heads/main' && 'prd') || 
+        (github.base_ref == 'homolog' && 'hml') || 
+        (github.ref == 'refs/heads/homolog' && 'hml') || 
+        'dev' 
+      }}
+    permissions:
+      contents: read
+
+    env:
+      ENV: >-
+        ${{ 
+          github.event.inputs.environment || 
+          (github.base_ref == 'main' && 'prd') || 
+          (github.ref == 'refs/heads/main' && 'prd') || 
+          (github.base_ref == 'homolog' && 'hml') || 
+          (github.ref == 'refs/heads/homolog' && 'hml') || 
+          'dev' 
+        }}
+
+    steps:
+      - name: 📥 Checkout do Repositorio
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔧 Terraform Init
+        working-directory: infra
+        run: terraform init
+
+      - name: 🔍 Terraform Validate
+        working-directory: infra
+        run: terraform validate
+
+      - name: 📋 Terraform Plan
+        working-directory: infra
+        run: terraform plan -var-file="environments/${{ env.ENV }}.tfvars" -out=tfplan
+
+      - name: 🚀 Terraform Apply
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/homolog'
+        working-directory: infra
+        run: terraform apply -auto-approve tfplan

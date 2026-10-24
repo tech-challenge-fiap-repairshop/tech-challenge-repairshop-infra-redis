@@ -1,0 +1,5 @@
+aws_region        = "us-east-1"
+environment       = "prd"
+cluster_name      = "repairshop"
+node_type         = "cache.t3.small"
+s3_tfstate_bucket = "fiap-repairshop2"
