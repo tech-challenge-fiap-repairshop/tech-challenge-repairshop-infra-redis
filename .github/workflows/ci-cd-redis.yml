@@ -31,8 +31,8 @@ env:
   AWS_REGION: 'us-east-1'
 
 jobs:
-  deploy:
-    name: "🚀 Build, Test & Deploy (AWS Redis)"
+  validate:
+    name: "🔍 Terraform Format Check"
     if: |
       !contains(github.event.head_commit.message, '[skip-ci]') &&
       !contains(github.event.head_commit.message, '[skip ci]') &&
@@ -40,6 +40,28 @@ jobs:
       !contains(github.event.pull_request.title, '[skip-ci]') &&
       !contains(github.event.pull_request.title, '[skip ci]') &&
       !contains(github.event.pull_request.title, '[ci skip]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.5"
+
+      - name: 🎨 Terraform Format Check
+        run: |
+          cd infra
+          terraform fmt -check
+
+  deploy:
+    name: "🚀 Build, Test & Deploy (AWS Redis)"
+    needs: validate
+    if: |
+      needs.validate.result == 'success' &&
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prd'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: >-
@@ -123,11 +145,6 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.8.5"
-
-      - name: 🎨 Terraform Format Check
-        run: |
-          cd infra
-          terraform fmt -check
 
       - name: 🔧 Terraform Init (Backend Dinamico por Ambiente)
         run: |
