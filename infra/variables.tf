@@ -25,7 +25,6 @@ variable "node_type" {
 variable "s3_tfstate_bucket" {
   description = "Bucket S3 do remote state da infraestrutura de rede"
   type        = string
-  default     = "fiap-repairshop2"
 }
 
 variable "remote_state_network_key" {
